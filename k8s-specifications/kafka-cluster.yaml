@@ -2,32 +2,72 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: kafka
-  namespace: argocd 
+  namespace: argocd
 spec:
   project: default
   source:
-    repoURL: 'https://charts.bitnami.com/bitnami' 
-    targetRevision: 32.4.3                     
+    repoURL: 'https://charts.bitnami.com/bitnami'
+    targetRevision: 32.4.3
     chart: kafka
     helm:
       values: |
-        # Minimal configuration for zero-cost footprint
+        # Optimized configuration for lightweight Kafka
         zookeeper:
+          enabled: true
           replicaCount: 1
-          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 250m, memory: 256Mi } }
+          persistence:
+            enabled: false
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+
         controller:
           replicaCount: 1
-          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 250m, memory: 256Mi } }
+          persistence:
+            enabled: false
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+
         broker:
           replicaCount: 1
-          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
+          persistence:
+            enabled: false
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        # Service exposure (for dev/testing use only)
+        service:
+          type: ClusterIP
+
+        # Disable metrics by default to save resources
+        metrics:
+          kafka:
+            enabled: false
+          jmx:
+            enabled: false
+
   destination:
-    server: 'https://kubernetes.default.svc' 
-    namespace: 'kafka'                       
+    server: 'https://kubernetes.default.svc'
+    namespace: kafka
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-
-    - CreateNamespace=true
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
