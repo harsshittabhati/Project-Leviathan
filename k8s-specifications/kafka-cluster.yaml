@@ -11,9 +11,13 @@ spec:
     chart: kafka
     helm:
       values: |
-        # Optimized configuration for lightweight Kafka
+        # Minimal configuration for zero-cost footprint
+
+        # Disable persistence for Zookeeper, Controller, and Broker
+        persistence:
+          enabled: false
+
         zookeeper:
-          enabled: true
           replicaCount: 1
           persistence:
             enabled: false
@@ -49,25 +53,22 @@ spec:
               cpu: 500m
               memory: 512Mi
 
-        # Service exposure (for dev/testing use only)
-        service:
-          type: ClusterIP
-
-        # Disable metrics by default to save resources
+        # Disable metrics & monitoring to save resources
         metrics:
+          jmx:
+            enabled: false
           kafka:
             enabled: false
-          jmx:
+        prometheus:
+          operator:
             enabled: false
 
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: kafka
+    namespace: 'kafka'
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - PruneLast=true
-      - ApplyOutOfSyncOnly=true
