@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: 'https://charts.bitnami.com/bitnami' 
-    targetRevision: 26.2.2                     
+    targetRevision: 32.4.3                     
     chart: kafka
     helm:
       values: |
@@ -29,4 +29,5 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
+
     - CreateNamespace=true
