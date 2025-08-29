@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka
+  namespace: argocd 
+spec:
+  project: default
+  source:
+    repoURL: 'https://charts.bitnami.com/bitnami' 
+    targetRevision: 26.2.2                     
+    chart: kafka
+    helm:
+      values: |
+        # Minimal configuration for zero-cost footprint
+        zookeeper:
+          replicaCount: 1
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 250m, memory: 256Mi } }
+        controller:
+          replicaCount: 1
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 250m, memory: 256Mi } }
+        broker:
+          replicaCount: 1
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
+  destination:
+    server: 'https://kubernetes.default.svc' 
+    namespace: 'kafka'                       
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
