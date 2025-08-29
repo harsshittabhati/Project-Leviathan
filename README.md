@@ -16,12 +16,15 @@ This guide covers the steps to:
 
 ## Architecture
 
-![Architecture diagram](k8s-kind-voting-app.png)
+<img width="6810" height="3292" alt="image" src="https://github.com/user-attachments/assets/4f34c375-c6a6-4479-96a5-6a7282b2bead" />
+
 
 ## Observability
 
-![Grafana diagram](grafana.png)
-![Prometheus diagram](prometheus.png)
+<img width="1628" height="921" alt="image" src="https://github.com/user-attachments/assets/d8173af9-9120-450c-b5b4-e62e23a66477" />
+
+<img width="1915" height="813" alt="image" src="https://github.com/user-attachments/assets/045556c1-7059-47d4-8ca8-7ca7f1bdee52" />
+
 
 * A front-end web app in [Python](/vote) which lets you vote between two options
 * A [Redis](https://hub.docker.com/_/redis/) which collects new votes
