@@ -16,12 +16,14 @@ This guide covers the steps to:
 
 ## Architecture
 
-<img width="6810" height="3292" alt="image" src="https://github.com/user-attachments/assets/4f34c375-c6a6-4479-96a5-6a7282b2bead" />
+<img width="6810" height="2826" alt="Leviathan-k8" src="https://github.com/user-attachments/assets/1dc83674-1c32-4ce7-95f1-6011d4e42cdc" />
+
 
 
 ## Observability
 
-<img width="1628" height="921" alt="image" src="https://github.com/user-attachments/assets/d8173af9-9120-450c-b5b4-e62e23a66477" />
+<img width="1920" height="898" alt="grafana" src="https://github.com/user-attachments/assets/102ff9f8-51b0-4a72-aca1-b188f1b452dd" />
+
 
 <img width="1915" height="813" alt="image" src="https://github.com/user-attachments/assets/045556c1-7059-47d4-8ca8-7ca7f1bdee52" />
 
