@@ -1,0 +1,23 @@
+config:
+
+  sharedSecret: "773upQ28x9uCPONQ0Tj4SFK/AHkdbLxbPnVABD5nJ4I=" 
+  cookieSecret: "yrM9nrsnP1R13L/jpV4goWak/bc+YpAGxlcbj/nZCXg=" 
+
+  policy:
+    - from: https://grafana.corp.example.com
+      to: http://grafana.default.svc.cluster.local 
+      allowed_users:
+        - chandnamanan2004@gmail.com 
+
+authenticate:
+  url: https://authenticate.corp.example.com
+  idp:
+    provider: google
+    clientID: "218679235726-af9rn185bkbami0fjspm4cnkvn7mm2o6.apps.googleusercontent.com"
+    clientSecret: "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"
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
