@@ -1,0 +1,111 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: canary-app
+  namespace: security-canary
+data:
+  app.py: |
+    from flask import Flask, request
+    import requests, os
+
+    app = Flask(__name__)
+    ELK_URL = os.getenv("ELK_URL", "http://elk-stack:9200/canary-logs/_doc")
+
+    @app.route("/", methods=["GET"])
+    def home():
+        data = {"alert": "Honeytoken accessed!", "source": request.remote_addr}
+        try:
+            requests.post(ELK_URL, json=data, timeout=2)
+        except Exception as e:
+            print(f"Failed to send alert: {e}")
+        return "Nothing to see here.\n", 200
+
+    if __name__ == "__main__":
+        app.run(host="0.0.0.0", port=8080)
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canary
+  namespace: security-canary
+  labels:
+    app.kubernetes.io/name: canary
+    app.kubernetes.io/part-of: honeytoken-system
+    env: dev
+    owner: security-team
+spec:
+  selector:
+    app: canary
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canary
+  namespace: security-canary
+  labels:
+    app.kubernetes.io/name: canary
+    app.kubernetes.io/part-of: honeytoken-system
+    env: dev
+    owner: security-team
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: canary
+  template:
+    metadata:
+      labels:
+        app: canary
+        app.kubernetes.io/name: canary
+        app.kubernetes.io/part-of: honeytoken-system
+        env: dev
+        owner: security-team
+    spec:
+      hostIPC: false
+      hostNetwork: false
+      hostPID: false
+      initContainers: []          # must be an empty array
+      containers:
+        - name: app
+          image: docker.io/naveenbana5250/canary:latest
+          env:
+            - name: FLASK_APP
+              value: /app/app.py
+            - name: ELK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: elk-endpoint
+                  key: ELK_URL
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          securityContext:
+            privileged: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: app
+              mountPath: /app
+      volumes:
+        - name: app
+          configMap:
+            name: canary-app
