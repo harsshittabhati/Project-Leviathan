@@ -1,0 +1,55 @@
+# 1. Deny all baseline
+apiVersion: "cilium.io/v2"
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: baseline-deny-all
+spec:
+  endpointSelector: {}
+  ingressDeny:
+  - {}
+  egressDeny:
+  - {}
+
+---
+
+# 2. Allow DNS + API server
+apiVersion: "cilium.io/v2"
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: allow-dns-and-apiserver
+spec:
+  endpointSelector: {}
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+  - toEntities:
+    - kube-apiserver
+
+---
+
+# 3. App micro-segmentation
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: three-tier-microsegmentation
+  namespace: default
+specs:
+- endpointSelector:
+    matchLabels:
+      app: backend
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app: frontend
+- endpointSelector:
+    matchLabels:
+      app: database
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app: backend
