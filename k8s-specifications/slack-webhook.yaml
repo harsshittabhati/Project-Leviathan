@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slack-integration-decoy
+  namespace: default
+data:
+  webhook_url: "https://hooks.slack.com/services/TFAKE1234/BFAKE5678/aBcDeFgHiJkLmNoPqRsTuVwX"
