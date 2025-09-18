@@ -1,0 +1,229 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-signed-images
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+  - name: require-signed-images
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    verifyImages:
+    - imageReferences:
+      - docker.io/naveenbana5250/*
+      attestors:
+      - entries:
+        - keys:
+            secret:
+              name: cosign-pub
+              namespace: kyverno
+      required: true
+      verifyDigest: true
+      mutateDigest: true
+      useCache: true
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-registries
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+  - name: approved-registries-only
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: Only images from docker.io/naveenbana5250/* are allowed
+      foreach:
+      - list: "request.object.spec.containers[].image"
+        deny:
+          conditions:
+          - key: "{{ regex_match('^docker\\.io/naveenbana5250/.+', element) }}"
+            operator: Equals
+            value: false
+      - list: "request.object.spec.initContainers[].image"
+        deny:
+          conditions:
+          - key: "{{ regex_match('^docker\\.io/naveenbana5250/.+', element) }}"
+            operator: Equals
+            value: false
+      - list: "request.object.spec.ephemeralContainers[].image"
+        deny:
+          conditions:
+          - key: "{{ regex_match('^docker\\.io/naveenbana5250/.+', element) }}"
+            operator: Equals
+            value: false
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-digest-and-ban-latest
+spec:
+  validationFailureAction: Audit
+  background: false
+  rules:
+  - name: no-latest-tag
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: :latest tag is not allowed
+      foreach:
+      - list: "request.object.spec.containers[].image"
+        deny:
+          conditions:
+          - key: "{{ regex_match('^.+:latest(@sha256:[A-Fa-f0-9]{64})?$', element) }}"
+            operator: Equals
+            value: true
+      - list: "request.object.spec.initContainers[].image"
+        deny:
+          conditions:
+          - key: "{{ regex_match('^.+:latest(@sha256:[A-Fa-f0-9]{64})?$', element) }}"
+            operator: Equals
+            value: true
+      - list: "request.object.spec.ephemeralContainers[].image"
+        deny:
+          conditions:
+          - key: "{{ regex_match('^.+:latest(@sha256:[A-Fa-f0-9]{64})?$', element) }}"
+            operator: Equals
+            value: true
+  - name: must-pin-by-digest
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: Images must be pinned by digest (@sha256)
+      foreach:
+      - list: "request.object.spec.containers[].image"
+        deny:
+          conditions:
+          - key: "{{ regex_match('^.+@sha256:[A-Fa-f0-9]{64}$', element) }}"
+            operator: Equals
+            value: false
+      - list: "request.object.spec.initContainers[].image"
+        deny:
+          conditions:
+          - key: "{{ regex_match('^.+@sha256:[A-Fa-f0-9]{64}$', element) }}"
+            operator: Equals
+            value: false
+      - list: "request.object.spec.ephemeralContainers[].image"
+        deny:
+          conditions:
+          - key: "{{ regex_match('^.+@sha256:[A-Fa-f0-9]{64}$', element) }}"
+            operator: Equals
+            value: false
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: baseline-security-context
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+  - name: harden-containers
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: Containers must run non-root, read-only FS, no privilege escalation, drop ALL caps, seccomp RuntimeDefault
+      pattern:
+        spec:
+          hostNetwork: "false"
+          hostPID: "false"
+          hostIPC: "false"
+          containers:
+          - name: "*"
+            securityContext:
+              runAsNonRoot: true
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              privileged: false
+              capabilities:
+                drop:
+                - ALL
+              seccompProfile:
+                type: RuntimeDefault
+          initContainers:
+          - name: "*"
+            securityContext:
+              runAsNonRoot: true
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              privileged: false
+              capabilities:
+                drop:
+                - ALL
+              seccompProfile:
+                type: RuntimeDefault
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resources
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+  - name: requests-and-limits
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      message: CPU/memory requests and limits are required
+      pattern:
+        spec:
+          containers:
+          - name: "*"
+            resources:
+              requests:
+                cpu: "?*"
+                memory: "?*"
+              limits:
+                cpu: "?*"
+                memory: "?*"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-standard-labels
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+  - name: labels-required
+    match:
+      any:
+      - resources:
+          kinds:
+          - Deployment
+          - StatefulSet
+          - DaemonSet
+          - Job
+          - CronJob
+          - Pod
+    validate:
+      message: Standard labels are required
+      pattern:
+        metadata:
+          labels:
+            app.kubernetes.io/name: "?*"
+            owner: "?*"
+            env: "?*"
+

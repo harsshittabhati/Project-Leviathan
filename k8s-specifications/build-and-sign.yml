@@ -1,0 +1,141 @@
+name: Build, Sign, Enforce, Test, Deploy
+on:
+  push:
+    branches: [ "main" ]
+
+concurrency:
+  group: kyverno-deploy
+  cancel-in-progress: true
+
+jobs:
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker Hub login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/leviathan-app:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/leviathan-app:${{ github.sha }}
+
+      - name: Export digest
+        run: echo "IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/leviathan-app@${{ steps.build.outputs.digest }}" >> $GITHUB_ENV
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.5.0
+
+      - name: Write cosign keys
+        run: |
+          printf '%s\n' "${{ secrets.COSIGN_PRIVATE_KEY }}" > cosign.key
+          printf '%s\n' "${{ secrets.COSIGN_PUBLIC_KEY }}" > cosign.pub
+
+      - name: Sign image
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: cosign sign --key cosign.key --yes "$IMAGE"
+
+      - name: Verify signature
+        run: cosign verify --key cosign.pub "$IMAGE"
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Setup helm
+        uses: azure/setup-helm@v4
+
+      - name: Configure kubeconfig
+        run: |
+          echo "${{ secrets.KUBECONFIG_CONTENT }}" > kubeconfig
+          echo "KUBECONFIG=$PWD/kubeconfig" >> $GITHUB_ENV
+
+      - name: Cleanup stuck Kyverno Helm releases
+        env:
+          KUBECONFIG: ${{ env.KUBECONFIG }}
+        run: |
+          echo "Cleaning up any stuck Kyverno Helm release secrets..."
+          kubectl -n kyverno get secret -l "name=kyverno,owner=helm" -o name | xargs -r kubectl delete --ignore-not-found
+
+      - name: Install or upgrade Kyverno
+        env:
+          KUBECONFIG: ${{ env.KUBECONFIG }}
+        run: |
+          helm repo add kyverno https://kyverno.github.io/kyverno/
+          helm repo update
+          helm upgrade --install kyverno kyverno/kyverno \
+            --namespace kyverno --create-namespace \
+            --set webhook.failurePolicy=Fail --wait --timeout=300s
+          kubectl -n kyverno rollout status deploy -l app.kubernetes.io/name=kyverno --timeout=300s
+
+      - name: Create or update cosign public key secret
+        env:
+          KUBECONFIG: ${{ env.KUBECONFIG }}
+        run: |
+          kubectl -n kyverno create secret generic cosign-pub \
+            --from-file=cosign.pub=./cosign.pub \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply Kyverno foundation policies
+        env:
+          KUBECONFIG: ${{ env.KUBECONFIG }}
+        run:  kubectl apply --server-side --force-conflicts -f Phase1/cluster/kyverno/policies/kyverno-foundation.yaml
+
+      - name: Negative test unsigned image
+        env:
+          KUBECONFIG: ${{ env.KUBECONFIG }}
+        run: |
+          set +e
+          kubectl run unsigned-test --image=nginx:1.25-alpine --restart=Never
+          rc=$?
+          if [ $rc -eq 0 ]; then
+            echo "Unsigned or unauthorized image was allowed"
+            kubectl delete pod unsigned-test --force --grace-period=0 || true
+            exit 1
+          else
+            echo "Unsigned or unauthorized image was blocked"
+          fi
+          set -e
+
+      - name: Ensure required labels
+        uses: mikefarah/yq@v4.44.3
+        with:
+          cmd: |
+            yq -i '
+              .metadata.labels = (.metadata.labels // {}) |
+              .metadata.labels."app.kubernetes.io/name" = (.metadata.labels."app.kubernetes.io/name" // "leviathan-app") |
+              .metadata.labels.owner = (.metadata.labels.owner // "defense-team") |
+              .metadata.labels.env = (.metadata.labels.env // "dev") |
+              .spec.template.metadata.labels = (.spec.template.metadata.labels // {}) |
+              .spec.template.metadata.labels."app.kubernetes.io/name" = (.spec.template.metadata.labels."app.kubernetes.io/name" // "leviathan-app") |
+              .spec.template.metadata.labels.owner = (.spec.template.metadata.labels.owner // "defense-team") |
+              .spec.template.metadata.labels.env = (.spec.template.metadata.labels.env // "dev")
+            ' Phase1/cluster/manifests/deployment.yaml
+
+      - name: Pin digest in manifest
+        uses: mikefarah/yq@v4.44.3
+        with:
+          cmd: |
+            yq -i '
+              (.spec.template.spec.containers[] | select(.name == "leviathan-app").image) = strenv(IMAGE) |
+              (.spec.template.spec.initContainers[]? | select(.name == "leviathan-app").image) = strenv(IMAGE)
+            ' Phase1/cluster/manifests/deployment.yaml
+
+      - name: Deploy signed workload
+        env:
+          KUBECONFIG: ${{ env.KUBECONFIG }}
+        run: kubectl apply -f Phase1/cluster/manifests/deployment.yaml
+
+      - name: Cleanup
+        if: always()
+        run: rm -f cosign.key cosign.pub kubeconfig

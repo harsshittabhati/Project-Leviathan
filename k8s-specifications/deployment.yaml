@@ -2,25 +2,16 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: leviathan-app
-  namespace: resilience-lab
-  labels:
-    app.kubernetes.io/name: leviathan-app
-    owner: defense-team
-    env: dev
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: leviathan-app
+      app: leviathan-app
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: leviathan-app
-        owner: defense-team
-        env: dev
+        app: leviathan-app
     spec:
       containers:
-        - name: leviathan-app
-          image: docker.io/naveenbana5250/leviathan-app@sha256:11990a0718d64eaf93fc6a7fea21f730762fe3643882f8823461bb7fe1ea148c
-          ports:
-            - containerPort: 80
+      - name: leviathan-app
+        image: naveenbana5250/leviathan-app:latest  # signed image
