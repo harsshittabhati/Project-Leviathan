@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: stripe-api-key-decoy
+  namespace: default
+type: Opaque
+stringData:
+  # This mimics a real Stripe secret key format
+  STRIPE_SECRET_KEY: "sk_test_51FAKEKEYVp8fkeL8fAKEFakeKeyRakeYakePakeOakeFake1234567"
