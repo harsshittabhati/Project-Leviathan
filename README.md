@@ -10,13 +10,6 @@ Project Leviathan successfully delivered a comprehensive, zero-trust security ec
 ## Architecture
 <img width="930" height="619" alt="Leviathan drawio" src="https://github.com/user-attachments/assets/117cd3a6-5806-42e1-ac13-0dd040de4f2e" />
 
-## Observability
-
-<img width="1920" height="898" alt="grafana" src="https://github.com/user-attachments/assets/102ff9f8-51b0-4a72-aca1-b188f1b452dd" />
-
-
-<img width="1915" height="813" alt="image" src="https://github.com/user-attachments/assets/045556c1-7059-47d4-8ca8-7ca7f1bdee52" />
-
 
 * A front-end web app in [Python](/vote) which lets you vote between two options
 * A [Redis](https://hub.docker.com/_/redis/) which collects new votes
@@ -102,28 +95,3 @@ This approach enabled the full deployment of the ecosystem while maintaining pla
 | | Neo4j Asset Graph | *ACHIEVED* | Asset inventory and relationship mapping is operational. |
 
 ---
-
-## Deployment via GitOps
-
-The entire platform state is managed declaratively. To deploy, point an Argo CD instance to the Git repository.
-
-```yaml
-# Example: Argo CD Root Application
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: root
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: '[https://github.com/harsshittabhati/Project-Leviathan.git](https://github.com/harsshittabhati/Project-Leviathan.git)'
-    path: argocd/apps
-    targetRevision: HEAD
-  destination:
-    server: '[https://kubernetes.default.svc](https://kubernetes.default.svc)'
-    namespace: default
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
