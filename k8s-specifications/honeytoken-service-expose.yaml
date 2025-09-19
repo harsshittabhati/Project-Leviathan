@@ -1,0 +1,14 @@
+# k8s-specifications/honeytoken-service-expose.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: honeytoken-service-external
+  namespace: default
+spec:
+  type: LoadBalancer
+  selector:
+    app: honeytoken-service
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
