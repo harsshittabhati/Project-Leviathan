@@ -1,4 +1,42 @@
 # k8s-specifications/honeytoken-service.yaml
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: honeytoken-script
+  namespace: default
+data:
+  honeytoken.py: |
+    import http.server, socketserver, sys, time
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def _log(self):
+            print("---- HONEYTOKEN HIT:", time.strftime("%Y-%m-%dT%H:%M:%S"), "----")
+            print("PATH:", self.path)
+            for k,v in self.headers.items():
+                print(f"HDR {k}: {v}")
+
+        def do_GET(self):
+            self._log()
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def do_POST(self):
+            length = int(self.headers.get('content-length',0))
+            body = self.rfile.read(length) if length else b''
+            self._log()
+            print("BODY:", body.decode('utf-8', errors='replace'))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+    server = socketserver.TCPServer(('', 8080), Handler)
+    print('starting honeytoken service on 8080')
+    server.serve_forever()
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,38 +55,17 @@ spec:
       containers:
         - name: honeytoken
           image: python:3.11-alpine
-          command:
-            - sh
-            - -c
-            - |
-              apk add --no-cache socat >/dev/null 2>&1 || true
-              python - <<'PY'
-import http.server, socketserver, sys, time
-class Handler(http.server.BaseHTTPRequestHandler):
-    def _log(self):
-        print("---- HONEYTOKEN HIT:", time.strftime("%Y-%m-%dT%H:%M:%S"), "----")
-        print("PATH:", self.path)
-        for k,v in self.headers.items():
-            print(f"HDR {k}: {v}")
-    def do_GET(self):
-        self._log()
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"ok")
-    def do_POST(self):
-        length = int(self.headers.get('content-length',0))
-        body = self.rfile.read(length) if length else b''
-        self._log()
-        print("BODY:", body.decode('utf-8', errors='replace'))
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"ok")
-server = socketserver.TCPServer(('', 8080), Handler)
-print('starting honeytoken service on 8080')
-server.serve_forever()
-PY
+          command: ["python", "/scripts/honeytoken.py"]
           ports:
             - containerPort: 8080
+          volumeMounts:
+            - name: script-volume
+              mountPath: /scripts
+      volumes:
+        - name: script-volume
+          configMap:
+            name: honeytoken-script
+
 ---
 apiVersion: v1
 kind: Service
